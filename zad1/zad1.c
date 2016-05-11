@@ -64,7 +64,6 @@ int main(int argc, char *argv[]){
             exit(4);
         }
     }
-    //while(1);
 
     for (int i = 0; i < 5; i++) {
         if (pthread_join(philosophers[i], NULL) != 0) {
