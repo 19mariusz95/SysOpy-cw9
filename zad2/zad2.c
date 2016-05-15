@@ -3,11 +3,11 @@
 #include <time.h>
 #include <pthread.h>
 #include <zconf.h>
+#include <signal.h>
 
 typedef struct plane {
     int id;
-    int time;
-    int alive;
+    volatile int alive;
     int waiting;
 } plane;
 
@@ -24,15 +24,24 @@ int isfree = 1;
 int on_board = 0;
 pthread_t *thread_ids;
 struct plane *planes;
-int *alive;
 
 void cleanup() {
+    for (int i = 0; i < planes_num; i++) {
+        planes[i].alive = 0;
+    }
+    for (int i = 0; i < planes_num; i++) {
+        printf("wait for %d\n", i);
+        pthread_join(thread_ids[i], NULL);
+    }
     pthread_mutex_destroy(&mtx);
     pthread_cond_destroy(&starting);
     pthread_cond_destroy(&landing);
     free(thread_ids);
     free(planes);
-    free(alive);
+}
+
+void sighandler(int sig) {
+    exit(0);
 }
 
 void wait_for_perm(struct plane *p, int tmp) {
@@ -49,7 +58,7 @@ void wait_for_perm(struct plane *p, int tmp) {
         p->waiting = 0;
         wait_to_start--;
     } else if (tmp == 0) { //land
-        while (!isfree || on_board == k) {
+        while (!isfree || on_board == n) {
             pthread_cond_wait(&landing, &mtx);
             if (!p->waiting) {
                 p->waiting = 1;
@@ -102,13 +111,11 @@ void *thread_func(void *arg) {
         wait_for_perm(p, 0);
         land(p);
         printf("Plane %d landed\n", p->id);
-
-        usleep(p->time);
-
+        usleep(1000);
         wait_for_perm(p, 1);
         start(p);
         printf("Plane %d started\n", p->id);
-        usleep(p->time);
+        usleep(1000);
     }
     return NULL;
 }
@@ -118,39 +125,34 @@ int main(int argc, char *argv[]) {
         printf("not enough args\n");
         exit(1);
     }
+    signal(SIGINT, sighandler);
     atexit(cleanup);
-    srand(time(NULL));
-    int maxs = 10000;
+    srand(time(NULL));;
     planes_num = atoi(argv[1]);
     n = atoi(argv[2]);
     k = atoi(argv[3]);
     thread_ids = malloc(planes_num * sizeof(pthread_t));
-    alive = malloc(planes_num * sizeof(int));
     planes = malloc(planes_num * sizeof(struct plane));
 
     pthread_mutex_init(&mtx, NULL);
     pthread_cond_init(&starting, NULL);
     pthread_cond_init(&landing, NULL);
 
-    for (int i = 0; i < planes_num; i++)
-        alive[i] = 1;
-
-    for (int i = 0; i < planes_num - 1; i++) {
-        planes[i].id = i;
-        planes[i].time = rand() % maxs;
-        planes[i].alive = alive[i];
-        planes[i].waiting = 0;
-        pthread_create(&thread_ids[i], NULL, thread_func, &planes[i]);
-    }
-
-    pause();
+    sigset_t mask;
+    sigset_t old;
+    sigfillset(&mask);
+    pthread_sigmask(SIG_SETMASK, &mask, &old);
 
     for (int i = 0; i < planes_num; i++) {
-        alive[i] = 0;
-        pthread_join(thread_ids[i], NULL);
+        planes[i].id = i;
+        planes[i].waiting = 0;
+        planes[i].alive = 1;
+        if (pthread_create(&thread_ids[i], NULL, thread_func, &planes[i]) != 0)
+            exit(1);
     }
+    pthread_sigmask(SIG_SETMASK, &old, NULL);
 
-
-
-    return 0;
+    while (1) {
+        pause();
+    }
 }
