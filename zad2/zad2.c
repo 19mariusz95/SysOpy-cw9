@@ -18,10 +18,10 @@ pthread_cond_t landing;
 int planes_num;
 int n;
 int k;
-int wait_to_start = 0;
-int wait_to_land = 0;
-int isfree = 1;
-int on_board = 0;
+volatile int wait_to_start = 0;
+volatile int wait_to_land = 0;
+volatile int isfree = 1;
+volatile int on_board = 0;
 pthread_t *thread_ids;
 struct plane *planes;
 
