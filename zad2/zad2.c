@@ -8,7 +8,6 @@
 typedef struct plane {
     int id;
     volatile int alive;
-    int waiting;
 } plane;
 
 
@@ -30,7 +29,6 @@ void cleanup() {
         planes[i].alive = 0;
     }
     for (int i = 0; i < planes_num; i++) {
-        printf("wait for %d\n", i);
         pthread_join(thread_ids[i], NULL);
     }
     pthread_mutex_destroy(&mtx);
@@ -47,26 +45,17 @@ void sighandler(int sig) {
 void wait_for_perm(struct plane *p, int tmp) {
     pthread_mutex_lock(&mtx);
     if (tmp == 1) { //start
+        wait_to_start++;
         while (!isfree) {
-            if (!p->waiting) {
-                p->waiting = 1;
-                wait_to_start++;
-            }
             pthread_cond_wait(&starting, &mtx);
         }
         isfree = 0;
-        p->waiting = 0;
         wait_to_start--;
     } else if (tmp == 0) { //land
         while (!isfree || on_board == n) {
             pthread_cond_wait(&landing, &mtx);
-            if (!p->waiting) {
-                p->waiting = 1;
-                ++wait_to_land;
-            }
         }
         isfree = 0;
-        p->waiting = 0;
         wait_to_land--;
     }
     pthread_mutex_unlock(&mtx);
@@ -145,7 +134,6 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < planes_num; i++) {
         planes[i].id = i;
-        planes[i].waiting = 0;
         planes[i].alive = 1;
         if (pthread_create(&thread_ids[i], NULL, thread_func, &planes[i]) != 0)
             exit(1);
