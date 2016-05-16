@@ -3,10 +3,13 @@
 #include <stdlib.h>
 #include <semaphore.h>
 #include <zconf.h>
+#include <bits/signum.h>
+#include <signal.h>
 
 pthread_t philosophers[5];
 pthread_mutex_t forks[5];
 sem_t waiter;
+volatile int flaga = 1;
 
 void getFork(int fid) {
     pthread_mutex_lock(&forks[fid]);
@@ -20,14 +23,13 @@ void *fun(void *phid) {
     int id = *((int *) phid);
     int left = id;
     int right = (id + 1) % 5;
-    while (1) {
+    while (flaga) {
         usleep(rand() % 100);
         sem_wait(&waiter);
         getFork(left);
         getFork(right);
         printf("Philosopher %d is eating\n", id);
         usleep(rand() % 100);
-
         putFork(left);
         putFork(right);
         sem_post(&waiter);
@@ -35,9 +37,26 @@ void *fun(void *phid) {
     return NULL;
 }
 
+void cleanup() {
+    flaga = 0;
+    for (int i = 0; i < 5; i++) {
+        if (pthread_join(philosophers[i], NULL) != 0) {
+            printf("error while waiting for thread\n");
+            exit(6);
+        }
+    }
+    sem_destroy(&waiter);
+}
+
+void sighandler(int sig) {
+    exit(0);
+}
+
 int main(int argc, char *argv[]){
 
     srand(time(NULL));
+    atexit(cleanup);
+    signal(SIGINT, sighandler);
     sem_init(&waiter, 0, 4);
 
     pthread_mutexattr_t attr;
@@ -65,13 +84,7 @@ int main(int argc, char *argv[]){
         }
     }
 
-    for (int i = 0; i < 5; i++) {
-        if (pthread_join(philosophers[i], NULL) != 0) {
-            printf("error while waiting for thread\n");
-            exit(6);
-        }
+    while (1) {
+        pause();
     }
-    sem_destroy(&waiter);
-
-    return 0;
 }
