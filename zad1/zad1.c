@@ -26,11 +26,17 @@ void *fun(void *phid) {
     while (flaga) {
         usleep(rand() % 100);
         sem_wait(&waiter);
+        printf("Philosopher %d is waiting for left fork %d\n", id, left);
         getFork(left);
+        printf("Philosopger %d took left fork %d", id, left);
+        printf("Philosopher %d is waiting for right fork %d\n", id, right);
         getFork(right);
+        printf("Philosopger %d took right fork %d", id, right);
         printf("Philosopher %d is eating\n", id);
         usleep(rand() % 100);
+        printf("Phiosopher %d put left fork %d", id, left);
         putFork(left);
+        printf("Phiosopher %d put right fork %d", id, right);
         putFork(right);
         sem_post(&waiter);
     }

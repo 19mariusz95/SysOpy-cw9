@@ -46,12 +46,15 @@ void wait_for_perm(struct plane *p, int tmp) {
     pthread_mutex_lock(&mtx);
     if (tmp == 1) { //start
         wait_to_start++;
+        printf("plane %d wait for perm to start\n",p->id);
         while (!isfree) {
             pthread_cond_wait(&starting, &mtx);
         }
         isfree = 0;
         wait_to_start--;
     } else if (tmp == 0) { //land
+        wait_to_land++;
+        printf("plane %d wait for perm to land\n",p->id);
         while (!isfree || on_board == n) {
             pthread_cond_wait(&landing, &mtx);
         }
@@ -83,6 +86,7 @@ void land(struct plane *p) {
     ++on_board;
     isfree = 1;
     free_air();
+    printf("Plane %d landed, on board %d, want to start %d, want to land %d\n", p->id,on_board,wait_to_start,wait_to_land);
     pthread_mutex_unlock(&mtx);
 }
 
@@ -91,6 +95,7 @@ void start(struct plane *p) {
     on_board--;
     isfree = 1;
     free_air();
+    printf("Plane %d started, on board %d, want to start %d, want to land %d\n", p->id,on_board,wait_to_start,wait_to_land);
     pthread_mutex_unlock(&mtx);
 }
 
@@ -99,12 +104,10 @@ void *thread_func(void *arg) {
     while (p->alive) {
         wait_for_perm(p, 0);
         land(p);
-        printf("Plane %d landed\n", p->id);
-        usleep(1000);
+        usleep(10000);
         wait_for_perm(p, 1);
         start(p);
-        printf("Plane %d started\n", p->id);
-        usleep(1000);
+        usleep(10000);
     }
     return NULL;
 }
